@@ -9,28 +9,22 @@ from torch import nn
 from torch.nn import functional as F
 
 
-class ResidualBlock(nn.Module):
-    """Two 3x3 convolutions with an identity/projection skip connection."""
-
-    def __init__(self, in_channels: int, out_channels: int):
+class DoubleConv(nn.Module):
+    def __init__(self, in_channels, out_channels):
         super().__init__()
+
         self.layers = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1, bias=False),
+            nn.Conv2d(in_channels, out_channels, 3, padding=1),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1, bias=False),
+
+            nn.Conv2d(out_channels, out_channels, 3, padding=1),
             nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
         )
-        self.skip = (
-            nn.Identity()
-            if in_channels == out_channels
-            else nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False)
-        )
-        self.activation = nn.ReLU(inplace=True)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.activation(self.layers(x) + self.skip(x))
-
+    def forward(self, x):
+        return self.layers(x)
 
 class DownBlock(nn.Module):
     """Halve spatial dimensions, then apply a residual block."""
@@ -38,7 +32,7 @@ class DownBlock(nn.Module):
     def __init__(self, in_channels: int, out_channels: int):
         super().__init__()
         self.pool = nn.MaxPool2d(kernel_size=2)
-        self.conv = ResidualBlock(in_channels, out_channels)
+        self.conv = DoubleConv(in_channels, out_channels)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.conv(self.pool(x))
@@ -49,7 +43,7 @@ class UpBlock(nn.Module):
 
     def __init__(self, in_channels: int, skip_channels: int, out_channels: int):
         super().__init__()
-        self.conv = ResidualBlock(in_channels + skip_channels, out_channels)
+        self.conv = DoubleConv(in_channels + skip_channels, out_channels)
 
     def forward(self, x: torch.Tensor, skip: torch.Tensor) -> torch.Tensor:
         x = F.interpolate(x, size=skip.shape[-2:], mode="bilinear", align_corners=False)
@@ -66,7 +60,7 @@ class UNet(nn.Module):
             raise ValueError("in_channels >= 1, num_classes >= 2, base_channels >= 1 required")
 
         b = base_channels
-        self.enc1 = ResidualBlock(in_channels, b)
+        self.enc1 = DoubleConv(in_channels, b)
         self.enc2 = DownBlock(b, b * 2)
         self.enc3 = DownBlock(b * 2, b * 4)
         self.bottleneck = DownBlock(b * 4, b * 8)

@@ -1,6 +1,8 @@
 
 from pathlib import Path
-
+BASE_DIRCETORY = Path(
+    r"C:\Users\Riley\Desktop\Uni\COMP3710\PatternAnalysis-2026"
+)
 DATA_DIRECTORY = Path(
     r"C:\Users\Riley\Desktop\Uni\COMP3710\keras_slices_data"
 )
@@ -21,11 +23,11 @@ NUM_CLASSES = 6
 BASE_CHANNELS = 32
 
 # Training
-BATCH_SIZE = 4
+BATCH_SIZE = 8
 SEED = 4801322
-EPOCHS = 3
-LEARNING_RATE = 0.001
+EPOCHS = 5
+LEARNING_RATE = 0.0001
 NUM_WORKERS = 0
 
-MODEL_PATH = Path("outputs/improved_unet.pth")
+MODEL_PATH = BASE_DIRCETORY/"outputs"/"unet.pth"
 LOSS_PLOT_PATH = Path("outputs/loss.png")
