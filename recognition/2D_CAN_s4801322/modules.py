@@ -1,12 +1,99 @@
-"""A lightweight residual 2D U-Net for multi-class OASIS MRI segmentation.
-
-This is a proposed improved U-Net variant, not a verbatim reproduction of a
-specific published architecture. Output tensors contain unnormalised logits.
+"""
+2D CAN and baseline 2D Unet modules for multi-class 2D HipMRI segmentation.
 """
 
 import torch
 from torch import nn
 from torch.nn import functional as F
+
+class CAN(nn.Module):
+    def __init__(
+        self,
+        in_channels: int = 1,
+        num_classes: int = 2,
+        hidden_channels: int = 32,
+    ):
+        super().__init__()
+
+        # Extract basic features from the input MRI.
+        self.front_end = nn.Sequential(
+            nn.Conv2d(in_channels, hidden_channels, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(hidden_channels, hidden_channels, 3, padding=1),
+            nn.ReLU(inplace=True),
+        )
+
+        # Context aggregation using dilated convolutions.
+        context_layers = []
+
+        for dilation in (1, 1, 2, 4, 8, 16, 1):
+            context_layers.extend([
+                nn.Conv2d(
+                    hidden_channels,
+                    hidden_channels,
+                    kernel_size=3,
+                    dilation=dilation,
+                    padding=dilation,
+                ),
+                nn.ReLU(inplace=True),
+            ])
+
+        self.context = nn.Sequential(*context_layers)
+
+        # Produce one prediction channel per segmentation class.
+        self.output = nn.Conv2d(
+            hidden_channels,
+            num_classes,
+            kernel_size=1,
+        )
+
+    def forward(self, images):
+        features = self.front_end(images)
+        features = self.context(features)
+        return self.output(features)
+
+def dice_score(logits, masks, num_classes):
+    """
+    Calculate the Dice score for each segmentation class.
+
+    Args:
+        logits: Model predictions [B, C, H, W].
+        masks: Ground truth labels [B, H, W].
+        num_classes: Number of segmentation classes.
+
+    Returns:
+        Tensor of Dice scores [C].
+    """
+
+    # Convert model outputs to predicted class indices.
+    predictions = torch.argmax(logits, dim=1)
+
+    # One-hot encode predictions and ground truth.
+    predictions = F.one_hot(
+        predictions, num_classes=num_classes
+    )
+    masks = F.one_hot(
+        masks.long(), num_classes=num_classes
+    )
+
+    # Both tensors now have shape [B, H, W, C].
+    predictions = predictions.float()
+    masks = masks.float()
+
+    # Sum over batch and spatial dimensions.
+    dimensions = (0, 1, 2)
+
+    intersection = (predictions * masks).sum(dim=dimensions)
+
+    prediction_sum = predictions.sum(dim=dimensions)
+    mask_sum = masks.sum(dim=dimensions)
+
+    # Compute Dice for each class.
+    dice = (2 * intersection + 1e-6) / (
+        prediction_sum + mask_sum + 1e-6
+    )
+
+    return dice
 
 
 class DoubleConv(nn.Module):
@@ -16,11 +103,11 @@ class DoubleConv(nn.Module):
         self.layers = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, 3, padding=1),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
+            nn.ReLU(),
 
             nn.Conv2d(out_channels, out_channels, 3, padding=1),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
+            nn.ReLU(), #inplace doesn't allocate new memory for output default is false
         )
 
     def forward(self, x):

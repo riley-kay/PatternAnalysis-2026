@@ -1,7 +1,6 @@
 """Train and validate the HipMRI 2D U-Net.
 
 All paths and training hyperparameters are configured in config.py.
-Masks must contain class IDs 0..NUM_CLASSES-1 (not RGB colors).
 """
 
 from pathlib import Path
@@ -18,71 +17,28 @@ import time
 
 import torch.nn.functional as F
 
+PROSTATE_CLASS = 5
 
-class DiceCrossEntropyLoss(nn.Module):
-    def __init__(self, smooth=1e-6):
-        super().__init__()
-        self.smooth = smooth
-        self.ce = nn.CrossEntropyLoss()
-
-    def forward(self, logits, targets):
-        # Standard cross-entropy
-        ce_loss = self.ce(logits, targets)
-
-        num_classes = logits.shape[1]
-
-        # Convert predictions to probabilities
-        probs = torch.softmax(logits, dim=1)
-
-        # Convert ground truth into one-hot masks
-        targets_one_hot = F.one_hot(
-            targets.long(),
-            num_classes=num_classes
-        ).permute(0, 3, 1, 2).float()
-
-        # Calculate Dice for each class across the batch
-        dims = (0, 2, 3)
-
-        intersection = torch.sum(
-            probs * targets_one_hot, dim=dims
-        )
-
-        denominator = (
-            torch.sum(probs, dim=dims)
-            + torch.sum(targets_one_hot, dim=dims)
-        )
-
-        dice = (
-            2 * intersection + self.smooth
-        ) / (denominator + self.smooth)
-
-        # Exclude background (class 0)
-        dice_loss = 1 - dice[1:].mean()
-
-        return ce_loss + dice_loss
 
 def run_epoch(model, loader, loss_fn, device, optimizer=None):
-    """Run one epoch; return mean pixel loss and per-class Dice scores."""
+    """Run one epoch; return loss and per-class Dice scores."""
     training = optimizer is not None
     model.train(training)
+
     total_loss = 0.0
     total_images = 0
-    intersection = torch.zeros(config.NUM_CLASSES, dtype=torch.float64)
-    pred_count = torch.zeros(config.NUM_CLASSES, dtype=torch.float64)
-    target_count = torch.zeros(config.NUM_CLASSES, dtype=torch.float64)
+    intersection = torch.zeros(config.NUM_CLASSES, device=device)
+    pred_count = torch.zeros(config.NUM_CLASSES, device=device)
+    target_count = torch.zeros(config.NUM_CLASSES, device=device)
 
     with torch.set_grad_enabled(training):
         for images, masks in loader:
             images = images.to(device)
             masks = masks.to(device)
 
-            # CrossEntropyLoss requires masks with class IDs in [0, NUM_CLASSES).
+            # Check masks have class IDs in [0, NUM_CLASSES).
             if masks.min() < 0 or masks.max() >= config.NUM_CLASSES:
-                raise ValueError(
-                    f"Mask labels must be between 0 and {config.NUM_CLASSES - 1}; "
-                    f"found {masks.min().item()}..{masks.max().item()}. "
-                    "Inspect/remap the dataset labels before training."
-                )
+                raise ValueError("Mask labels must be integer class IDs 0..NUM_CLASSES-1")
 
             if training:
                 optimizer.zero_grad()
@@ -97,19 +53,48 @@ def run_epoch(model, loader, loss_fn, device, optimizer=None):
             total_loss += loss.item() * images.size(0)
             total_images += images.size(0)
 
+            # Hard predictions are used only for the evaluation Dice metric.
             predictions = logits.argmax(dim=1)
-            for cls in range(config.NUM_CLASSES):
-                predicted = predictions == cls
-                actual = masks == cls
-                intersection[cls] += (predicted & actual).sum().item()
-                pred_count[cls] += predicted.sum().item()
-                target_count[cls] += actual.sum().item()
+            for class_id in range(config.NUM_CLASSES):
+                predicted = predictions == class_id
+                actual = masks == class_id
+                intersection[class_id] += (predicted & actual).sum().item()
+                pred_count[class_id] += predicted.sum().item()
+                target_count[class_id] += actual.sum().item()
 
     denom = pred_count + target_count
     # Missing classes are reported as NaN, not a misleading perfect score.
-    dice = torch.where(denom > 0, 2 * intersection / denom.clamp_min(1), float('nan'))
-    return total_loss / total_images, dice.tolist()
+    dice = 2 * intersection / denom.clamp_min(1)
+    dice[denom == 0] = float("nan")  # Class absent from both prediction and truth.
+    return total_loss / total_images, dice.cpu()
 
+@torch.inference_mode()
+def measure_inference_time(model, dataset, device):
+    """Mean forward-pass time per MRI slice; excludes loading and preprocessing."""
+    model.eval()
+    loader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=0)
+
+    # Warm up CUDA before timing to avoid counting initial setup overhead.
+    sample_image, _ = dataset[0]
+    for _ in range(3):
+        model(sample_image.unsqueeze(0).to(device))
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+
+    total_seconds = 0.0
+    count = 0
+    for images, _ in loader:
+        images = images.to(device)
+        if device.type == "cuda":
+            torch.cuda.synchronize()
+        start = time.perf_counter()
+        model(images)
+        if device.type == "cuda":
+            torch.cuda.synchronize()
+        total_seconds += time.perf_counter() - start
+        count += 1
+
+    return 1000 * total_seconds / count  # milliseconds per slice
 
 def main():
     torch.manual_seed(config.SEED)
@@ -137,7 +122,7 @@ def main():
         num_classes=config.NUM_CLASSES,
         base_channels=config.BASE_CHANNELS,
     ).to(device)
-    loss_fn = DiceCrossEntropyLoss()
+    loss_fn = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=config.LEARNING_RATE)
 
     checkpoint_path = Path(config.MODEL_PATH)
@@ -151,11 +136,16 @@ def main():
         history["train"].append(train_loss)
         history["val"].append(val_loss)
 
+
+        # Mean foreground Dice excludes background and classes absent from both masks.
+        mean_dice = torch.nanmean(val_dice[1:]).item()
+        prostate_dice = val_dice[PROSTATE_CLASS].item()
         print(
             f"Epoch {epoch}/{config.EPOCHS} | "
             f"train loss: {train_loss:.4f} | val loss: {val_loss:.4f} | "
-            f"val Dice (per class): {[round(x, 3) for x in val_dice]}"
+            f"Prostate Dice: {prostate_dice:.4f} | Mean foreground Dice: {mean_dice:.4f}"
         )
+        print(f"  Dice by class: {[round(value, 4) for value in val_dice.tolist()]}")
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss

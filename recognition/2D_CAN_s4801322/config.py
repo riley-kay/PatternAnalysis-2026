@@ -25,9 +25,9 @@ BASE_CHANNELS = 32
 # Training
 BATCH_SIZE = 8
 SEED = 4801322
-EPOCHS = 5
+EPOCHS = 2
 LEARNING_RATE = 0.0001
 NUM_WORKERS = 0
 
-MODEL_PATH = BASE_DIRCETORY/"outputs"/"unet.pth"
-LOSS_PLOT_PATH = Path("outputs/loss.png")
+MODEL_PATH = BASE_DIRCETORY/"recognition"/"2D_UNet_s4801322"/"outputs"/"unet.pth"
+LOSS_PLOT_PATH = BASE_DIRCETORY/"recognition"/"2D_UNet_s4801322"/"outputs"/"loss.png"

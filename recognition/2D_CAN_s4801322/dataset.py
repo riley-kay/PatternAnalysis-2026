@@ -29,11 +29,11 @@ def load_data_2D(
     Load medical image data from names , cases list ``provided`` into a list for each.
 
     This function pre - allocates 4 D arrays for conv2d to avoid excessive
-    memory usage .
+    memory usage.
 
     normImage : bool ( normalise the image 0.0 -1.0)
     early_stop : Stop loading pre - maturely , leaves arrays mostly empty , for
-    quick loading and testing scripts .
+    quick loading and testing scripts.
     """
     affines = []
 
@@ -143,7 +143,7 @@ def main():
     image_directory=config.TRAIN_DIRECTORY,
     segmentation_directory=config.TRAIN_SEG_DIRECTORY,
     )
-    image, mask = train_dataset[30]
+    image, mask = train_dataset[40]
     print(f"Training pairs: {len(train_dataset)}")
     print(f"MRI shape: {tuple(image.shape)}, dtype: {image.dtype}")
     print(f"Mask shape: {tuple(mask.shape)}, dtype: {mask.dtype}")

@@ -1,4 +1,5 @@
-"""Evaluate the trained HipMRI 2D U-Net on the held-out test set.
+"""
+Evaluate the trained HipMRI 2D U-Net on the held-out test set.
 
 Uses the same dataset preprocessing and label mapping as train.py.
 All paths and model hyperparameters come from config.py.
