@@ -11,8 +11,54 @@ from torch.utils.data import DataLoader
 
 import config
 from dataset import HipMRI_Dataset
-from modules import UNet
+from modules import UNet, CAN, dice_score
 
+import numpy as np
+from scipy.ndimage import binary_erosion, distance_transform_edt
+
+
+def boundary_metrics(prediction, ground_truth, class_id=4, tolerance=2):
+    """
+    Calculate boundary precision, recall and F1 for one 2D mask.
+
+    prediction, ground_truth: [H, W] arrays of class indices.
+    tolerance: Maximum distance in pixels to count as a match.
+    """
+
+    # Extract the prostate region.
+    pred = np.asarray(prediction) == class_id
+    true = np.asarray(ground_truth) == class_id
+
+    # If both masks are empty, there is no boundary to evaluate.
+    if not pred.any() and not true.any():
+        return np.nan, np.nan, np.nan
+
+    # If only one mask is empty, the segmentation is incorrect.
+    if not pred.any() or not true.any():
+        return 0.0, 0.0, 0.0
+
+    # Find boundary pixels using erosion.
+    pred_boundary = pred & ~binary_erosion(pred)
+    true_boundary = true & ~binary_erosion(true)
+
+    # Distance from each pixel to the nearest boundary pixel.
+    distance_to_true = distance_transform_edt(~true_boundary)
+    distance_to_pred = distance_transform_edt(~pred_boundary)
+
+    # Fraction of predicted boundary pixels close to ground truth.
+    precision = (
+        (distance_to_true[pred_boundary] <= tolerance).mean()
+    )
+
+    # Fraction of ground-truth boundary pixels close to prediction.
+    recall = (
+        (distance_to_pred[true_boundary] <= tolerance).mean()
+    )
+
+    # Harmonic mean of precision and recall.
+    f1 = 2 * precision * recall / (precision + recall + 1e-8)
+
+    return float(precision), float(recall), float(f1)
 
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -28,10 +74,10 @@ def main():
         num_workers=config.NUM_WORKERS,
     )
 
-    model = UNet(
+    model = CAN(
         in_channels=config.IN_CHANNELS,
         num_classes=config.NUM_CLASSES,
-        base_channels=config.BASE_CHANNELS,
+        hidden_channels=config.BASE_CHANNELS,
     ).to(device)
     # Checkpoint was saved with torch.save(model.state_dict(), ...).
     state = torch.load(config.MODEL_PATH, map_location=device, weights_only=True)
@@ -43,6 +89,11 @@ def main():
     pred_counts = torch.zeros_like(intersections)
     true_counts = torch.zeros_like(intersections)
     example = None
+
+    # Store boundary metrics for every test image.
+    boundary_precisions = []
+    boundary_recalls = []
+    boundary_f1_scores = []
 
     with torch.inference_mode():
         for images, masks in test_loader:
@@ -58,7 +109,19 @@ def main():
                 intersections[cls] += (pred & true).sum().item()
                 pred_counts[cls] += pred.sum().item()
                 true_counts[cls] += true.sum().item()
+            # Calculate prostate boundary metrics for each image.
+            for prediction, mask in zip(predictions, masks):
+                precision, recall, f1 = boundary_metrics(
+                    prediction.numpy(),
+                    mask.numpy(),
+                    class_id=4,
+                    tolerance=2,
+                )
 
+                boundary_precisions.append(precision)
+                boundary_recalls.append(recall)
+                boundary_f1_scores.append(f1)
+    
     print(f"Test images: {len(test_dataset)}")
     print("Per-class test metrics (across the entire test set):")
     for cls in range(config.NUM_CLASSES):
@@ -69,6 +132,12 @@ def main():
         union = predicted + actual - intersection
         iou = intersection / union if union else float("nan")
         print(f"Class {cls}: Dice={dice:.4f}, IoU={iou:.4f}, target pixels={int(actual)}")
+    
+    # Report average prostate boundary metrics.
+    print("\nAverage prostate boundary metrics (2-pixel tolerance):")
+    print(f"Precision: {np.nanmean(boundary_precisions):.4f}")
+    print(f"Recall:    {np.nanmean(boundary_recalls):.4f}")
+    print(f"F1 score:  {np.nanmean(boundary_f1_scores):.4f}")
 
     # Show one example with exactly the same class-color scale for both masks.
     if example is not None:
@@ -79,12 +148,12 @@ def main():
         axes[1].imshow(actual, cmap="tab10", vmin=0, vmax=config.NUM_CLASSES - 1, interpolation="nearest")
         axes[1].set_title("Ground truth")
         axes[2].imshow(predicted, cmap="tab10", vmin=0, vmax=config.NUM_CLASSES - 1, interpolation="nearest")
-        axes[2].set_title("U-Net prediction")
+        axes[2].set_title("CAN prediction")
         for ax in axes:
             ax.axis("off")
         plt.tight_layout()
         plt.show()
-
+    
 
 if __name__ == "__main__":
     main()

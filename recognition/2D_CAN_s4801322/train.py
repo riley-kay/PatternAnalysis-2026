@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 
 import config
 from dataset import HipMRI_Dataset
-from modules import UNet
+from modules import UNet, CAN, dice_score
 import time
 
 import torch.nn.functional as F
@@ -117,10 +117,10 @@ def main():
         num_workers=config.NUM_WORKERS,
     )
 
-    model = UNet(
+    model = CAN(
         in_channels=config.IN_CHANNELS,
         num_classes=config.NUM_CLASSES,
-        base_channels=config.BASE_CHANNELS,
+        hidden_channels=config.BASE_CHANNELS,
     ).to(device)
     loss_fn = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=config.LEARNING_RATE)
@@ -162,7 +162,7 @@ def main():
     plt.plot(history["train"], label="Training")
     plt.plot(history["val"], label="Validation")
     plt.xlabel("Epoch")
-    plt.ylabel("Dice + Cross-Entropy Loss")
+    plt.ylabel("Cross-Entropy Loss")
     plt.legend()
     plt.tight_layout()
     plot_path = Path(config.LOSS_PLOT_PATH)
