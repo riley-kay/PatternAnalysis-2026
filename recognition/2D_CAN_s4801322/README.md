@@ -10,7 +10,7 @@ Epoch 8/20 | train loss: 0.0304 | val loss: 0.0708 | Prostate Dice: 0.8221 | Mea
 
 Trainable parameters: 1,949,286
 Peak inference GPU memory: 552.78 MiB
-Inference time per 2D slice: mean=2.76 ms, median=2.61 ms, p95=3.29 ms
+Inference time per 2D slice: mean=2.62 ms, median=2.54 ms, p95=3.09 ms
 Test images: 540
 Per-class test metrics (across the entire test set):
 Class 0: Dice=0.9982, IoU=0.9964, target pixels=5072679
@@ -23,9 +23,9 @@ Mean foreground Dice: 0.9164
 Prostate Dice (class 5): 0.8495
 
 Average prostate boundary metrics (2-pixel tolerance):
-Precision: 0.7421
-Recall:    0.7248
-F1 score:  0.7237
+Precision: 0.7496
+Recall:    0.6829
+F1 score:  0.7084
 
 ## 20 epoch batch norm CAN 32 hidden:
 Training time: 1195.64 seconds
@@ -35,7 +35,7 @@ Epoch 18/20 | train loss: 0.0500 | val loss: 0.0714 | Prostate Dice: 0.7897 | Me
 
 Trainable parameters: 75,078
 Peak inference GPU memory: 304.41 MiB
-Inference time per 2D slice: mean=1.65 ms, median=1.57 ms, p95=2.11 ms
+Inference time per 2D slice: mean=1.60 ms, median=1.57 ms, p95=1.92 ms
 Test images: 540
 Per-class test metrics (across the entire test set):
 Class 0: Dice=0.9978, IoU=0.9956, target pixels=5072679
@@ -48,9 +48,9 @@ Mean foreground Dice: 0.8950
 Prostate Dice (class 5): 0.8157
 
 Average prostate boundary metrics (2-pixel tolerance):
-Precision: 0.5946
-Recall:    0.6776
-F1 score:  0.6196
+Precision: 0.6413
+Recall:    0.6518
+F1 score:  0.6392
 
 ## 20 epoch batch norm CAN 64 hidden:
 Training time: 2521.01 seconds
@@ -60,7 +60,7 @@ Epoch 14/20 | train loss: 0.0394 | val loss: 0.0635 | Prostate Dice: 0.8277 | Me
 
 Trainable parameters: 297,606
 Peak inference GPU memory: 594.20 MiB
-Inference time per 2D slice: mean=3.28 ms, median=3.21 ms, p95=3.90 ms
+Inference time per 2D slice: mean=3.30 ms, median=3.20 ms, p95=3.98 ms
 Test images: 540
 Per-class test metrics (across the entire test set):
 Class 0: Dice=0.9980, IoU=0.9960, target pixels=5072679
@@ -73,12 +73,11 @@ Mean foreground Dice: 0.9060
 Prostate Dice (class 5): 0.8355
 
 Average prostate boundary metrics (2-pixel tolerance):
-Precision: 0.6471
-Recall:    0.7161
-F1 score:  0.6661
+Precision: 0.6643
+Recall:    0.6727
+F1 score:  0.6601
 
 ## 20 epoch CAN batch norm 128 hidden:
-Trainable parameters: 1,185,030
 Training time: 6705.68 seconds
 Peak allocated GPU memory: 5809.09 MiB
 Epoch 6/20 | train loss: 0.0389 | val loss: 0.0616 | Prostate Dice: 0.8253 | Mean foreground Dice: 0.8890
@@ -86,7 +85,7 @@ Epoch 6/20 | train loss: 0.0389 | val loss: 0.0616 | Prostate Dice: 0.8253 | Mea
 
 Trainable parameters: 1,185,030
 Peak inference GPU memory: 1177.38 MiB
-Inference time per 2D slice: mean=9.12 ms, median=8.73 ms, p95=10.12 ms
+Inference time per 2D slice: mean=8.96 ms, median=8.76 ms, p95=10.05 ms
 Test images: 540
 Per-class test metrics (across the entire test set):
 Class 0: Dice=0.9978, IoU=0.9956, target pixels=5072679
@@ -99,9 +98,9 @@ Mean foreground Dice: 0.9086
 Prostate Dice (class 5): 0.8479
 
 Average prostate boundary metrics (2-pixel tolerance):
-Precision: 0.6505
-Recall:    0.7137
-F1 score:  0.6675
+Precision: 0.7120
+Recall:    0.6861
+F1 score:  0.6886
 
 The main limitation for the base 2D U-net is that downsampling loses spatial detail, even though skip connections recover some of it.
 

@@ -102,10 +102,10 @@ def main():
         num_workers=config.NUM_WORKERS,
     )
 
-    model = CAN(
+    model = UNet(
         in_channels=config.IN_CHANNELS,
         num_classes=config.NUM_CLASSES,
-        hidden_channels=config.HIDDEN_CHANNELS,
+        base_channels=config.BASE_CHANNELS,
     ).to(device)
 
     # Count trainable model parameters.
@@ -156,7 +156,7 @@ def main():
                 precision, recall, f1 = boundary_metrics(
                     prediction.numpy(),
                     mask.numpy(),
-                    class_id=4,
+                    class_id=5,
                     tolerance=2,
                 )
 
@@ -166,8 +166,8 @@ def main():
 
                 # Score the prostate on this individual slice, rather than
                 # using the global Dice computed across the full test set.
-                predicted_prostate = prediction == 4
-                actual_prostate = mask == 4
+                predicted_prostate = prediction == 5
+                actual_prostate = mask == 5
                 if actual_prostate.any():
                     intersection = (predicted_prostate & actual_prostate).sum().item()
                     denominator = predicted_prostate.sum().item() + actual_prostate.sum().item()
