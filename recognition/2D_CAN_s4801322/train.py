@@ -1,4 +1,4 @@
-"""Train and validate the HipMRI 2D U-Net.
+"""Train and validate the HipMRI 2D CAN/U-Net.
 
 All paths and training hyperparameters are configured in config.py.
 """
@@ -12,10 +12,8 @@ from torch.utils.data import DataLoader
 
 import config
 from dataset import HipMRI_Dataset
-from modules import UNet, CAN, dice_score
+from modules import UNet, CAN
 import time
-
-import torch.nn.functional as F
 
 PROSTATE_CLASS = 5
 
@@ -68,34 +66,6 @@ def run_epoch(model, loader, loss_fn, device, optimizer=None):
     dice[denom == 0] = float("nan")  # Class absent from both prediction and truth.
     return total_loss / total_images, dice.cpu()
 
-@torch.inference_mode()
-def measure_inference_time(model, dataset, device):
-    """Mean forward-pass time per MRI slice; excludes loading and preprocessing."""
-    model.eval()
-    loader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=0)
-
-    # Warm up CUDA before timing to avoid counting initial setup overhead.
-    sample_image, _ = dataset[0]
-    for _ in range(3):
-        model(sample_image.unsqueeze(0).to(device))
-    if device.type == "cuda":
-        torch.cuda.synchronize()
-
-    total_seconds = 0.0
-    count = 0
-    for images, _ in loader:
-        images = images.to(device)
-        if device.type == "cuda":
-            torch.cuda.synchronize()
-        start = time.perf_counter()
-        model(images)
-        if device.type == "cuda":
-            torch.cuda.synchronize()
-        total_seconds += time.perf_counter() - start
-        count += 1
-
-    return 1000 * total_seconds / count  # milliseconds per slice
-
 def main():
     torch.manual_seed(config.SEED)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -117,10 +87,10 @@ def main():
         num_workers=config.NUM_WORKERS,
     )
 
-    model = UNet(
+    model = CAN(
         in_channels=config.IN_CHANNELS,
         num_classes=config.NUM_CLASSES,
-        base_channels=config.BASE_CHANNELS,
+        hidden_channels=config.HIDDEN_CHANNELS,
     ).to(device)
 
     loss_fn = nn.CrossEntropyLoss()
@@ -159,7 +129,9 @@ def main():
 
     if torch.cuda.is_available():
         memory = torch.cuda.max_memory_allocated() / 1024**2
-    print(f"Peak allocated GPU memory: {memory:.2f} MiB")
+        print(f"Peak allocated GPU memory: {memory:.2f} MiB")
+    else:
+        print("GPU memory usage: N/A (running on CPU)")
     plt.plot(history["train"], label="Training")
     plt.plot(history["val"], label="Validation")
     plt.xlabel("Epoch")

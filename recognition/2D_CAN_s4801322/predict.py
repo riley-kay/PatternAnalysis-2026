@@ -1,5 +1,5 @@
 """
-Evaluate the trained HipMRI 2D U-Net on the held-out test set.
+Evaluate the trained HipMRI 2D CAN/U-net on the held-out test set.
 
 Uses the same dataset preprocessing and label mapping as train.py.
 All paths and model hyperparameters come from config.py.
@@ -12,13 +12,13 @@ from torch.utils.data import DataLoader
 
 import config
 from dataset import HipMRI_Dataset
-from modules import UNet, CAN, dice_score
+from modules import UNet, CAN
 
 import numpy as np
 from scipy.ndimage import binary_erosion, distance_transform_edt
 
 
-def boundary_metrics(prediction, ground_truth, class_id=4, tolerance=2):
+def boundary_metrics(prediction, ground_truth, class_id=5, tolerance=2):
     """
     Calculate boundary precision, recall and F1 for one 2D mask.
 
@@ -102,10 +102,10 @@ def main():
         num_workers=config.NUM_WORKERS,
     )
 
-    model = UNet(
+    model = CAN(
         in_channels=config.IN_CHANNELS,
         num_classes=config.NUM_CLASSES,
-        base_channels=config.BASE_CHANNELS,
+        hidden_channels=config.HIDDEN_CHANNELS,
     ).to(device)
 
     # Count trainable model parameters.
@@ -136,6 +136,9 @@ def main():
     # Track the three lowest prostate Dice scores on slices containing prostate.
     worst_segmentations = []
     slice_index = 0
+
+    # Slices that need to be compared to another model
+    COMPARISON_SLICES = {8, 93, 130}
 
     with torch.inference_mode():
         for images, masks in test_loader:
@@ -182,7 +185,33 @@ def main():
                     ))
                     worst_segmentations.sort(key=lambda item: (item[0], item[1]))
                     worst_segmentations = worst_segmentations[:3]
+                
+                # Get matching slices to compare to another model
+                if slice_index in COMPARISON_SLICES:
 
+                    fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+
+                    axes[0].imshow(image[0].numpy(), cmap="gray")
+                    axes[0].set_title("MRI Input")
+
+                    axes[1].imshow(
+                        mask.numpy(), cmap="tab10",
+                        vmin=0, vmax=config.NUM_CLASSES - 1
+                    )
+                    axes[1].set_title("Ground Truth")
+
+                    axes[2].imshow(
+                        prediction.numpy(), cmap="tab10",
+                        vmin=0, vmax=config.NUM_CLASSES - 1
+                    )
+                    axes[2].set_title("Model Prediction")
+
+                    for ax in axes:
+                        ax.axis("off")
+
+                    plt.tight_layout()
+                    plt.savefig(config.BASE_DIRECETORY/ "recognition" / "2D_CAN_s4801322" / "figures" / f"unet_slice_{slice_index}.png")
+                    plt.close(fig)
                 slice_index += 1
 
     # Report inference memory and model-only timing, separately from data loading.

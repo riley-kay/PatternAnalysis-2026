@@ -55,50 +55,6 @@ class CAN(nn.Module):
         features = self.context(features)
         return self.output(features)
 
-def dice_score(logits, masks, num_classes):
-    """
-    Calculate the Dice score for each segmentation class.
-
-    Args:
-        logits: Model predictions [B, C, H, W].
-        masks: Ground truth labels [B, H, W].
-        num_classes: Number of segmentation classes.
-
-    Returns:
-        Tensor of Dice scores [C].
-    """
-
-    # Convert model outputs to predicted class indices.
-    predictions = torch.argmax(logits, dim=1)
-
-    # One-hot encode predictions and ground truth.
-    predictions = F.one_hot(
-        predictions, num_classes=num_classes
-    )
-    masks = F.one_hot(
-        masks.long(), num_classes=num_classes
-    )
-
-    # Both tensors now have shape [B, H, W, C].
-    predictions = predictions.float()
-    masks = masks.float()
-
-    # Sum over batch and spatial dimensions.
-    dimensions = (0, 1, 2)
-
-    intersection = (predictions * masks).sum(dim=dimensions)
-
-    prediction_sum = predictions.sum(dim=dimensions)
-    mask_sum = masks.sum(dim=dimensions)
-
-    # Compute Dice for each class.
-    dice = (2 * intersection + 1e-6) / (
-        prediction_sum + mask_sum + 1e-6
-    )
-
-    return dice
-
-
 class DoubleConv(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
@@ -117,7 +73,7 @@ class DoubleConv(nn.Module):
         return self.layers(x)
 
 class DownBlock(nn.Module):
-    """Halve spatial dimensions, then apply a residual block."""
+    """Halve spatial dimensions."""
 
     def __init__(self, in_channels: int, out_channels: int):
         super().__init__()
@@ -142,8 +98,11 @@ class UpBlock(nn.Module):
 
 
 class UNet(nn.Module):
-    """2D residual U-Net. Input: [B, 1, H, W]; output: [B, C, H, W]."""
+    """2D U-Net with encoder-decoder skip connections.
 
+    Input: [B, 1, H, W]
+    Output: [B, C, H, W]
+    """
     def __init__(self, in_channels: int = 1, num_classes: int = 4, base_channels: int = 32):
         super().__init__()
         if in_channels < 1 or num_classes < 2 or base_channels < 1:

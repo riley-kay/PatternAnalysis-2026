@@ -1,6 +1,6 @@
 
 from pathlib import Path
-BASE_DIRCETORY = Path(
+BASE_DIRECETORY = Path(
     r"C:\Users\Riley\Desktop\Uni\COMP3710\PatternAnalysis-2026"
 )
 DATA_DIRECTORY = Path(
@@ -30,6 +30,7 @@ EPOCHS = 20
 LEARNING_RATE = 0.0001
 NUM_WORKERS = 0
 
-MODEL_PATH = BASE_DIRCETORY/"recognition"/"2D_CAN_s4801322"/"outputs"/"unet_32_base.pth"
-LOSS_PLOT_PATH = BASE_DIRCETORY/"recognition"/"2D_CAN_s4801322"/"outputs"/"loss_unet_32_base_16.png"
-WORST_CASE_PATH = BASE_DIRCETORY/"recognition"/"2D_CAN_s4801322"/"outputs"/"worst_seg_predicitons"/"UNet"
+# Output directories
+MODEL_PATH = BASE_DIRECETORY/"recognition"/"2D_CAN_s4801322"/"outputs"/"model.pth" # path for saved model
+LOSS_PLOT_PATH = BASE_DIRECETORY/"recognition"/"2D_CAN_s4801322"/"outputs"/"loss_model.png" # path for training loss plot
+WORST_CASE_PATH = BASE_DIRECETORY/"recognition"/"2D_CAN_s4801322"/"outputs"/"worst_seg_predicitons"/"model" # path for worst test segmentations

@@ -7,14 +7,6 @@ import nibabel as nib
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
-def to_channels(arr:np.ndarray , dtype = np.uint8)->np.ndarray:
-    channels = np.unique(arr)
-    res = np.zeros(arr.shape + (len(channels),) , dtype = dtype)
-    for c in channels :
-        c = int(c)
-        res[..., c : c +1][arr == c] = 1
-    return res
-
 # load medical image functions
 def load_data_2D(
         imageNames, 
@@ -23,16 +15,15 @@ def load_data_2D(
         dtype = np.float32, 
         getAffines = False, 
         early_stop = False,
-        target_size = (256, 144)
+        target_size = config.PAD_SIZE
         ):
     """
     Load medical image data from names , cases list ``provided`` into a list for each.
 
-    This function pre - allocates 4 D arrays for conv2d to avoid excessive
+    This function pre - allocates 3D arrays for conv2d to avoid excessive
     memory usage.
 
-    normImage : bool ( normalise the image 0.0 -1.0)
-    early_stop : Stop loading pre - maturely , leaves arrays mostly empty , for
+    early_stop : Stop loading pre - maturely , allocates and loads only the first 22 images, for
     quick loading and testing scripts.
     """
     affines = []
@@ -71,11 +62,11 @@ def load_data_2D(
     return (images, affines) if getAffines else images
 
 class HipMRI_Dataset(Dataset):
-    """Load paired HipMRI images and pixel-wise segmentation masks.
+    """Load paired HipMRI images and segmentation masks.
 
     Returns:
-        image: float32 tensor [1, H, W], intensities in [0, 1]
-        mask:  int64 tensor [H, W], containing original class IDs
+        image: float32 tensor [1, H, W], standardized per slice.
+        mask: int64 tensor [H, W], containing class indices.
     """
 
     def __init__(self, image_directory, segmentation_directory, early_stop=False):
