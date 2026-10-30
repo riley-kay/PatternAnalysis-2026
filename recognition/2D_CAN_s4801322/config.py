@@ -20,14 +20,16 @@ PAD_SIZE = (256, 144)
 # Model
 IN_CHANNELS = 1
 NUM_CLASSES = 6
-BASE_CHANNELS = 64
+BASE_CHANNELS = 32
+HIDDEN_CHANNELS = 128
 
 # Training
-BATCH_SIZE = 8
+BATCH_SIZE = 16
 SEED = 4801322
-EPOCHS = 30
+EPOCHS = 20
 LEARNING_RATE = 0.0001
 NUM_WORKERS = 0
 
-MODEL_PATH = BASE_DIRCETORY/"recognition"/"2D_CAN_s4801322"/"outputs"/"can.pth"
-LOSS_PLOT_PATH = BASE_DIRCETORY/"recognition"/"2D_CAN_s4801322"/"outputs"/"loss_can.png"
+MODEL_PATH = BASE_DIRCETORY/"recognition"/"2D_CAN_s4801322"/"outputs"/"can_128_hidden.pth"
+LOSS_PLOT_PATH = BASE_DIRCETORY/"recognition"/"2D_CAN_s4801322"/"outputs"/"loss_unet_32_base_16.png"
+WORST_CASE_PATH = BASE_DIRCETORY/"recognition"/"2D_CAN_s4801322"/"outputs"/"worst_seg_predicitons"/"CAN_128_hidden"

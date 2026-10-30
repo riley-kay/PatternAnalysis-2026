@@ -117,11 +117,12 @@ def main():
         num_workers=config.NUM_WORKERS,
     )
 
-    model = CAN(
+    model = UNet(
         in_channels=config.IN_CHANNELS,
         num_classes=config.NUM_CLASSES,
-        hidden_channels=config.BASE_CHANNELS,
+        base_channels=config.BASE_CHANNELS,
     ).to(device)
+
     loss_fn = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=config.LEARNING_RATE)
 

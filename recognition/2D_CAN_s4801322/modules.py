@@ -18,8 +18,10 @@ class CAN(nn.Module):
         # Extract basic features from the input MRI.
         self.front_end = nn.Sequential(
             nn.Conv2d(in_channels, hidden_channels, 3, padding=1),
+            nn.BatchNorm2d(hidden_channels),
             nn.ReLU(inplace=True),
             nn.Conv2d(hidden_channels, hidden_channels, 3, padding=1),
+            nn.BatchNorm2d(hidden_channels),
             nn.ReLU(inplace=True),
         )
 
@@ -35,6 +37,7 @@ class CAN(nn.Module):
                     dilation=dilation,
                     padding=dilation,
                 ),
+                nn.BatchNorm2d(hidden_channels),
                 nn.ReLU(inplace=True),
             ])
 
